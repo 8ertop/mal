@@ -1,96 +1,62 @@
 const { spawn } = require("child_process");
 const { readFileSync } = require("fs-extra");
-const http = require("http");
 const axios = require("axios");
 const semver = require("semver");
 const logger = require("./utils/log");
+const express = require("express");
+const gradient = require("gradient-string")
+const logo = `
+ ██████╗  █████╗  ███╗   ███╗ ██╗ 
+██╔════╝ ██╔══██╗ ████╗ ████║ ██║ 
+╚█████╗  ██║  ██║ ██╔████╔██║ ██║ 
+ ╚═══██╗ ██║  ██║ ██║╚██╔╝██║ ██║ 
+██████╔╝ ╚█████╔╝ ██║ ╚═╝ ██║ ██║ 
+╚═════╝   ╚════╝  ╚═╝     ╚═╝ ╚═╝ 
+`;
+const c = ["cyan", "#7D053F"];
+const redToGreen = gradient("red", "cyan");
+console.log(redToGreen("━".repeat(50), { interpolation: "hsv" }));
+const text = gradient(c).multiline(logo);
+console.log(text);
+console.log(redToGreen("━".repeat(50), { interpolation: "hsv" }));
 
-/////////////////////////////////////////////
-//========= Check node.js version =========//
-/////////////////////////////////////////////
 
-// const nodeVersion = semver.parse(process.version);
-// if (nodeVersion.major < 13) {
-//     logger(`Your Node.js ${process.version} is not supported, it required Node.js 13 to run bot!`, "error");
-//     return process.exit(0);
-// };
 
-///////////////////////////////////////////////////////////
-//========= Create website for dashboard/uptime =========//
-///////////////////////////////////////////////////////////
-
-const dashboard = http.createServer(function (_req, res) {
-    res.writeHead(200, "OK", { "Content-Type": "text/plain" });
-    res.write("X_MTKBR_X");
-    res.end();
+const app = express();
+const port = process.env.PORT || 3078; 
+app.get("/", (req, res) => {
+  res.send(`Hello im SOMI..🧸`);
 });
-
-const PORT = process.env.PORT || 3000;
-dashboard.listen(PORT, () => {
-    logger(`Server is running on port ${PORT}`, "[ Starting ]");
-});
-
-logger("Opened server site...", "[ Starting ]");
-
-/////////////////////////////////////////////////////////
-//========= Create start bot and make it loop =========//
-/////////////////////////////////////////////////////////
 
 function startBot(message) {
-    if (message) logger(message, "[ Starting ]");
+  (message) ? logger(message, "[ Starting ]") : "";
 
-    const child = spawn("node", ["--trace-warnings", "--async-stack-traces", "mirai.js"], {
-        cwd: __dirname,
-        stdio: "inherit",
-        shell: true
-    });
+  const child = spawn("node", ["--trace-warnings", "--async-stack-traces", "SOMI.js"], {
+    cwd: __dirname,
+    stdio: "inherit",
+    shell: true
+  });
 
-    child.on("close", (codeExit) => {
-        if (codeExit != 0 && (!global.countRestart || global.countRestart < 5)) {
-            global.countRestart = (global.countRestart || 0) + 1;
-            startBot("Restarting...");
-        }
-    });
+  child.on("close", (codeExit) => {
+    if (codeExit != 0 || global.countRestart && global.countRestart < 5) {
+      startBot("Starting up...");
+      global.countRestart += 1;
+      return;
+    } else return;
+  });
 
-    child.on("error", function (error) {
-        logger("An error occurred: " + JSON.stringify(error), "[ Starting ]");
-    });
+  child.on("error", function(error) {
+    logger("An error occurred: " + JSON.stringify(error), "[ Starting ]");
+  });
 };
 
-////////////////////////////////////////////////
-//========= Check update from Github =========//
-////////////////////////////////////////////////
 
-axios.get("https://raw.githubusercontent.com/d-jukie/miraiv2/main/package.json").then((res) => {
-    logger(res.data.name, "[ NAME ]");
-    logger("Version: " + res.data.version, "[ VERSION ]");
-    logger(res.data.description, "[ DESCRIPTION ]");
-});
+  logger('SOMI BOT', "[ NAME ]");
+  logger("Version: 1.1.0", "[ VERSION ]");
+
+
 startBot();
-/*axios.get("https://raw.githubusercontent.com/d-jukie/miraiv2_fix/main/package.json").then((res) => {
-    const local = JSON.parse(readFileSync('./package.json'));
-    if (semver.lt(local.version, res.data.version)) {
-        if (local.autoUpdate) {
-            logger('A new update is available, start update processing...', '[ UPDATE ]');
-            const updateBot = {
-                cwd: __dirname,
-                stdio: 'inherit',
-                shell: true
-            };
-            const child = spawn('node', ['update.js'], updateBot);
-            child.on('exit', function () {
-                return process.exit(0);
-            });
-            child.on('error', function (error) {
-                logger('Unable to update: ' + JSON.stringify(error), '[ CHECK UPDATE ]');
-            });
-        } else {
-            logger('A new update is available! Open terminal/cmd and type "node update" to update!', '[ UPDATE ]');
-            startBot();
-        }
-    } else {
-        logger('You are using the latest version!', '[ CHECK UPDATE ]');
-        startBot();
-    }
-}).catch(err => logger("Unable to check update.", "[ CHECK UPDATE ]"));*/
-// THIZ BOT WAS MADE BY ME(CATALIZCS) AND MY BROTHER SPERMLORD - DO NOT STEAL MY CODE
+
+app.listen(port, () => {
+  console.log(`bot running in port: ${port}`);
+});
