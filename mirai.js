@@ -1,12 +1,42 @@
-const moment = require("moment-timezone");
+const chalk = require('chalk');
+var cron = require("node-cron");
+const { exec } = require("child_process");
+const timerestart = 120
+var cron = require('node-cron');
+
+exec("rm -rf script/commands/data && mkdir -p script/commands/data && rm -rf script/commands/tad/* ", (error, stdout, stderr) => {
+    if (error) {
+        console.log(`error: ${error.message}`);
+        return;
+    }
+    if (stderr) {
+        console.log(`stderr: ${stderr}`);
+        return;
+    }
+    console.log(chalk.bold.hex("#00FA9A")("[ AUTO CLEAR CACHE ] 🪽❯ ") + chalk.hex("#00FA9A")("Successfully delete cache"))
+});
+
+const DateAndTime = new Date().toLocaleString('en-US', {
+
+         timeZone: 'Asia/Manila'
+ }); 
+//console.log(DateAndTime);
+console.log(chalk.bold.hex("#059242").bold(DateAndTime));
+
+
+//////////////////////////////////////////////////////
+//========= Require all variable need use =========//
+/////////////////////////////////////////////////////
+
 const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, rm } = require("fs-extra");
 const { join, resolve } = require("path");
 const { execSync } = require('child_process');
 const logger = require("./utils/log.js");
-const login = require("./fb-chat-api"); 
+const login = require("./includes/fca/index.js");
 const axios = require("axios");
 const listPackage = JSON.parse(readFileSync('./package.json')).dependencies;
 const listbuiltinModules = require("module").builtinModules;
+console.log(chalk.bold.hex("#03f0fc").bold("[ SOMI ] » ") + chalk.bold.hex("#fcba03").bold("Initializing variables..."));
 
 global.client = new Object({
     commands: new Map(),
@@ -17,29 +47,8 @@ global.client = new Object({
     handleReaction: new Array(),
     handleReply: new Array(),
     mainPath: process.cwd(),
-    configPath: new String(),
-  getTime: function (option) {
-        switch (option) {
-            case "seconds":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("ss")}`;
-            case "minutes":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("mm")}`;
-            case "hours":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("HH")}`;
-            case "date": 
-                return `${moment.tz("Asia/Ho_Chi_minh").format("DD")}`;
-            case "month":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("MM")}`;
-            case "year":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("YYYY")}`;
-            case "fullHour":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("HH:mm:ss")}`;
-            case "fullYear":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("DD/MM/YYYY")}`;
-            case "fullTime":
-                return `${moment.tz("Asia/Ho_Chi_minh").format("HH:mm:ss DD/MM/YYYY")}`;
-        }
-  }
+    configPath: new String()
+   // premiumListsPath: new String(),
 });
 
 global.data = new Object({
@@ -55,7 +64,8 @@ global.data = new Object({
     allThreadID: new Array()
 });
 
-global.utils = require("./utils");
+global.utils = require("./utils/index.js");
+
 
 global.nodemodule = new Object();
 
@@ -70,6 +80,7 @@ global.language = new Object();
 //////////////////////////////////////////////////////////
 //========= Find and get variable from Config =========//
 /////////////////////////////////////////////////////////
+
 
 var configValue;
 try {
@@ -92,7 +103,7 @@ try {
 }
 catch { return logger.loader("Can't load file config!", "error") }
 
-const { Sequelize, sequelize } = require("./includes/database");
+const { Sequelize, sequelize } = require("./includes/database/index.js");
 
 writeFileSync(global.client.configPath + ".temp", JSON.stringify(global.config, null, 4), 'utf8');
 
@@ -123,7 +134,7 @@ global.getText = function (...args) {
     }
     return text;
 }
-
+console.log(global.getText('mirai', 'foundPathAppstate'))
 try {
     var appStateFile = resolve(join(global.client.mainPath, global.config.APPSTATEPATH || "appstate.json"));
     var appState = require(appStateFile);
@@ -136,23 +147,26 @@ catch { return logger.loader(global.getText("mirai", "notFoundPathAppstate"), "e
 ////////////////////////////////////////////////////////////
 
 
+
 function onBot({ models: botModel }) {
     const loginData = {};
     loginData['appState'] = appState;
     login(loginData, async(loginError, loginApiData) => {
         if (loginError) return logger(JSON.stringify(loginError), `ERROR`);
-        loginApiData.setOptions(global.config.FCAOption)
+
+loginApiData.setOptions(global.config.FCAOption)
         writeFileSync(appStateFile, JSON.stringify(loginApiData.getAppState(), null, '\x09'))
         global.config.version = '1.2.14'
         global.client.timeStart = new Date().getTime(),
             function () {
-                const listCommand = readdirSync(global.client.mainPath + '/modules/commands').filter(command => command.endsWith('.js') && !command.includes('example') && !global.config.commandDisabled.includes(command));
-                for (const command of listCommand) {
-                    try {
-                        var module = require(global.client.mainPath + '/modules/commands/' + command);
-                        if (!module.config || !module.run || !module.config.commandCategory) throw new Error(global.getText('mirai', 'errorFormat'));
-                        if (global.client.commands.has(module.config.name || '')) throw new Error(global.getText('mirai', 'nameExist'));
-                        if (!module.languages || typeof module.languages != 'object' || Object.keys(module.languages).length == 0) logger.loader(global.getText('mirai', 'notFoundLanguage', module.config.name), 'warn');
+              const listCommand = readdirSync(global.client.mainPath + '/script/commands').filter(command => command.endsWith('.js') && !command.includes('example') && !global.config.commandDisabled.includes(command));
+              for (const command of listCommand) {
+                try {
+                  var module = require(global.client.mainPath + '/script/commands/' + command);
+                  if (!module.config || !module.run || !module.config.commandCategory) throw new Error("Error in cmd format");
+                  if (global.client.commands.has(module.config.name || '')) throw new Error("Name Is Repeated");
+
+                  
                         if (module.config.dependencies && typeof module.config.dependencies == 'object') {
                             for (const reqDependencies in module.config.dependencies) {
                                 const reqDependenciesPath = join(__dirname, 'nodemodules', 'node_modules', reqDependencies);
@@ -207,15 +221,15 @@ function onBot({ models: botModel }) {
                         global.client.commands.set(module.config.name, module);
                         logger.loader(global.getText('mirai', 'successLoadModule', module.config.name));
                     } catch (error) {
-                        console.log(error)
+                        logger.loader(global.getText('mirai', 'failLoadModule', module.config.name, error), 'error');
                     };
                 }
             }(),
             function() {
-                const events = readdirSync(global.client.mainPath + '/modules/events').filter(event => event.endsWith('.js') && !global.config.eventDisabled.includes(event));
+                const events = readdirSync(global.client.mainPath + '/script/events').filter(event => event.endsWith('.js') && !global.config.eventDisabled.includes(event));
                 for (const ev of events) {
                     try {
-                        var event = require(global.client.mainPath + '/modules/events/' + ev);
+                        var event = require(global.client.mainPath + '/script/events/' + ev);
                         if (!event.config || !event.run) throw new Error(global.getText('mirai', 'errorFormat'));
                         if (global.client.events.has(event.config.name) || '') throw new Error(global.getText('mirai', 'nameExist'));
                         if (event.config.dependencies && typeof event.config.dependencies == 'object') {
@@ -269,9 +283,8 @@ function onBot({ models: botModel }) {
                         global.client.events.set(event.config.name, event);
                         logger.loader(global.getText('mirai', 'successLoadModule', event.config.name));
                     } catch (error) {
-                        const moduleName = event.config && event.config.name ? event.config.name : 'unknown';
-                  logger.loader(global.getText('mirai', 'failLoadModule', moduleName, error), 'error');
-                }
+                        logger.loader(global.getText('mirai', 'failLoadModule', event.config.name, error), 'error');
+                    }
                 }
             }()
         logger.loader(global.getText('mirai', 'finishLoadModule', global.client.commands.size, global.client.events.size)) 
@@ -281,7 +294,7 @@ function onBot({ models: botModel }) {
         const listenerData = {};
         listenerData.api = loginApiData; 
         listenerData.models = botModel;
-        const listener = require('./includes/listen')(listenerData);
+        const listener = require('./includes/listen.js')(listenerData);
 
         function listenerCallback(error, message) {
             if (error) return logger(global.getText('mirai', 'handleListenError', JSON.stringify(error)), 'error');
@@ -290,57 +303,147 @@ function onBot({ models: botModel }) {
             return listener(message);
         };
         global.handleListen = loginApiData.listenMqtt(listenerCallback);
-        try {
-            await checkBan(loginApiData);
-        } catch (error) {
-            return //process.exit(0);
-        };
-        if (!global.checkBan) logger(global.getText('mirai', 'warningSourceCode'), '[ GLOBAL BAN ]');
+        
+        
         global.client.api = loginApiData
+        logger(`SOMI ✨`, '[ by Y-ANBU ]');
+        
+        
+      var cron = require("node-cron");
+      //notif if bot is kaka on palang
+const momentt = require("moment-timezone").tz("Africa/Casablanca");
+    const time = momentt.format("HH:mm:ss");
+loginApiData.sendMessage(`لـقـد تـم تـشـغـيـل الـبـوت فـي ${time}✅`, global.config.ADMINBOT[0])
+
+      //for autochange bio naman
+cron.schedule(`0 0 */1 * * *`, () => {
+var o = moment.tz("Asia/Manila").format("MM/DD/YYYY");
+  loginApiData.changeBio(`Prefix: ${global.config.PREFIX}\n\nBot Name: ${global.config.BOTNAME}\nDate Now: ${o}`);
+}, {
+  scheduled: true,
+  timezone: "Africa/Casablanca"
+}); 
       
+cron.schedule('0 0 0 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Morning everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 1 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Morning everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 5 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Morning everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 6 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Morning everyone! let's eat breakfast", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 7 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Morning everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 12 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Afternoon everyone! let's eat lunch", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 13 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Afternoon everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false, 
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 18 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("Good Evening everyone!", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+cron.schedule('0 0 21 * * *', () => {
+  loginApiData.getThreadList(30, null, ["INBOX"], (err, list) => {
+    if (err) return console.log("ERR: "+err);
+    list.forEach(now => (now.isGroup == false && now.threadID != list.threadID) ? loginApiData.sendMessage("It's 9:00PM time to sleep Goodnight everyone", now.threadID) : '');
+  });
+}, {
+  scheduled: false,
+  timezone: "Asia/Manila"
+});
+        //66666
+     
+        // setInterval(async function () {
+        //     // global.handleListen.stopListening(),
+        //     global.checkBan = ![],
+        //     setTimeout(function () {
+        //         return global.handleListen = loginApiData.listenMqtt(listenerCallback);
+        //     }, 500);
+        //     try {
+        //         await checkBan(loginApiData);
+        //     } catch {
+        //         return process.exit(0);
+        //     };
+        //     if (!global.checkBan) logger(global.getText('mirai', 'warningSourceCode'), '[ GLOBAL BAN ]');
+        //     global.config.autoClean && (global.data.threadInfo.clear(), global.client.handleReply = global.client.handleReaction = {});
+        //     if (global.config.DeveloperMode == !![]) 
+        //         return logger(global.getText('mirai', 'refreshListen'), '[ DEV MODE ]');
+        // }, 600000);
     });
 }
 //////////////////////////////////////////////
 //========= Connecting to Database =========//
 //////////////////////////////////////////////
 
+(async() => {
+    try {
+        await sequelize.authenticate();
+        const authentication = {};
+        authentication.Sequelize = Sequelize;
+        authentication.sequelize = sequelize;
+        const models = require('./includes/database/model.js')(authentication);
+        logger(global.getText('mirai', 'successConnectDatabase'), '[ DATABASE ]');
+        const botData = {};
+        botData.models = models
+        onBot(botData);
+    } catch (error) { logger(global.getText('mirai', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]'); }
+console.log(chalk.bold.hex("#eff1f0").bold("════════════════ SUCCESFULLY ═════════════════"));
 
-function rainbowText(text) {
-  const rainbowColors = ['#4169E1', '#4169E1', '#4169E1', '#4169E1'];
-  let rainbowText = '';
-  let colorIndex = 0;
-
-  for (let i = 0; i < text.length; i++) {
-    const color = rainbowColors[colorIndex % rainbowColors.length];
-    rainbowText += `\x1b[38;2;${parseInt(color.slice(1, 3), 16)};${parseInt(color.slice(3, 5), 16)};${parseInt(color.slice(5, 7), 16)}m${text[i]}\x1b[0m`;
-    colorIndex++;
-  }
-
-  return rainbowText;
-}
-
-const rainbowArt = `
-       █  █‌ ▀█▀  █▀█
-       █▄▄█  █   █▀█`;
-
-console.log(rainbowText(rainbowArt));
-
-
-
-
-(async () => {
-  try {
-    await sequelize.authenticate();
-    const authentication = {};
-    authentication.Sequelize = Sequelize;
-    authentication.sequelize = sequelize;
-    const models = require('./includes/database/model')(authentication);
-    logger(global.getText('mirai', 'successConnectDatabase'), '[ DATABASE ]');
-    const botData = {};
-    botData.models = models;
-    onBot(botData);
-  } catch (error) {
-    logger(global.getText('mirai', 'successConnectDatabase', JSON.stringify(error)), '[ DATABASE ]');
-  }
 })();
 process.on('unhandledRejection', (err, p) => {});
+
+
